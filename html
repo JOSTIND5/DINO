@@ -1,0 +1,240 @@
+import pygame # type: ignore
+import random
+import sys
+
+# Inicializar Pygame
+pygame.init()
+
+# Configuración de la ventana
+ANCHO = 800
+ALTO = 400
+ventana = pygame.display.set_mode((ANCHO, ALTO))
+pygame.display.set_caption("Animal Runner")
+
+# Colores
+BLANCO = (255, 255, 255)
+NEGRO = (0, 0, 0)
+VERDE = (0, 128, 0)
+
+# Clase para el jugador
+class Jugador(pygame.sprite.Sprite):
+    def __init__(self, animal):
+        super().__init__()
+        self.animal = animal
+        self.velocidad_salto = 0
+        self.gravedad = 1
+        self.saltando = False
+        self.imagenes = {
+            'dino': [pygame.image.load('dino1.png'), pygame.image.load('dino2.png')],
+            'kanguro': [pygame.image.load('kanguro1.png'), pygame.image.load('kanguro2.png')],
+            'pajaro': [pygame.image.load('pajaro1.png'), pygame.image.load('pajaro2.png')],
+            'unicornio': [pygame.image.load('unicornio1.png'), pygame.image.load('unicornio2.png')]
+        }
+        self.image = self.imagenes[self.animal][0]
+        self.rect = self.image.get_rect(midbottom=(80, 350))
+        self.animacion_index = 0
+        self.tiempo_animacion = 0
+        
+        # Atributos especiales por animal
+        self.habilidades = {
+            'dino': {'salto': 20, 'velocidad': 10},
+            'kanguro': {'salto': 25, 'velocidad': 8},
+            'pajaro': {'salto': 15, 'velocidad': 12, 'vuelo': True},
+            'unicornio': {'salto': 22, 'velocidad': 15, 'invencible': True}
+        }
+
+    def saltar(self):
+        if not self.saltando:
+            self.velocidad_salto = -self.habilidades[self.animal]['salto']
+            self.saltando = True
+
+    def aplicar_gravedad(self):
+        self.velocidad_salto += self.gravedad
+        self.rect.y += self.velocidad_salto
+        if self.rect.bottom >= 350:
+            self.rect.bottom = 350
+            self.saltando = False
+
+    def animar(self):
+        self.tiempo_animacion += 1
+        if self.tiempo_animacion >= 10:
+            self.animacion_index = (self.animacion_index + 1) % 2
+            self.image = self.imagenes[self.animal][self.animacion_index]
+            self.tiempo_animacion = 0
+
+    def update(self):
+        self.aplicar_gravedad()
+        self.animar()
+
+# Clase para los obstáculos
+class Obstaculo(pygame.sprite.Sprite):
+    def __init__(self, tipo):
+        super().__init__()
+        tipos = {
+            'cactus': pygame.image.load('cactus.png'),
+            'piedra': pygame.image.load('piedra.png'),
+            'nube': pygame.image.load('nube.png')
+        }
+        self.image = tipos[tipo]
+        self.rect = self.image.get_rect(midbottom=(random.randint(900, 1100), 350))
+
+    def update(self):
+        self.rect.x -= velocidad_juego
+        if self.rect.right < 0:
+            self.kill()
+
+# Función para mostrar texto
+def mostrar_texto(texto, tamaño, x, y):
+    fuente = pygame.font.Font(None, tamaño)
+    superficie = fuente.render(texto, True, BLANCO)
+    rect = superficie.get_rect(center=(x, y))
+    ventana.blit(superficie, rect)
+
+# Menú de selección de animal
+def seleccionar_animal():
+    animales = ['dino', 'kanguro', 'pajaro', 'unicornio']
+    seleccionado = 0
+    while True:
+        ventana.fill(VERDE)
+        mostrar_texto("Selecciona tu animal:", 50, ANCHO//2, 50)
+        
+        for i, animal in enumerate(animales):
+            color = BLANCO if i == seleccionado else NEGRO
+            mostrar_texto(animal.capitalize(), 40, ANCHO//2, 150 + i*60)
+            pygame.draw.rect(ventana, color, (ANCHO//2 - 100, 130 + i*60, 200, 40), 3)
+
+        for evento in pygame.event.get():
+            if evento.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if evento.type == pygame.KEYDOWN:
+                if evento.key == pygame.K_DOWN:
+                    seleccionado = (seleccionado + 1) % 4
+                if evento.key == pygame.K_UP:
+                    seleccionado = (seleccionado - 1) % 4
+                if evento.key == pygame.K_RETURN:
+                    return animales[seleccionado]
+
+        pygame.display.update()
+
+# Configuración del juego
+velocidad_juego = 8
+puntaje = 0
+reloj = pygame.time.Clock()
+
+# Bucle principal del juego
+animal_seleccionado = seleccionar_animal()
+jugador = Jugador(animal_seleccionado)
+obstaculos = pygame.sprite.Group()
+
+while True:
+    for evento in pygame.event.get():
+        if evento.type == pygame.QUIT:
+            pygame.quit()
+            sys.exit()
+        if evento.type == pygame.KEYDOWN:
+            if evento.key == pygame.K_SPACE:
+                jugador.saltar()
+
+    # Generar obstáculos
+    if random.random() < 0.02:
+        obstaculos.add(Obstaculo(random.choice(['cactus', 'piedra', 'nube'])))
+
+    # Actualizar elementos
+    jugador.update()
+    obstaculos.update()
+    
+    # Colisiones
+    if pygame.sprite.spritecollide(jugador, obstaculos, False):
+        pygame.time.delay(2000)
+        pygame.quit()
+        sys.exit()
+
+    # Dibujar en pantalla
+    ventana.fill(VERDE)
+    pygame.draw.line(ventana, BLANCO, (0, 350), (ANCHO, 350), 3)
+    
+    obstaculos.draw(ventana)
+    ventana.blit(jugador.image, jugador.rect)
+    
+    # Mostrar puntaje
+    puntaje += 1
+    mostrar_texto(f"Puntaje: {puntaje//10}", 30, ANCHO - 100, 50)
+
+    pygame.display.update()
+    reloj.tick(60)
+
+    from PIL import Image, ImageDraw # type: ignore
+
+# Crear imágenes para los animales (32x32 pixels)
+def crear_imagenes():
+    # Dinosaurio
+    img = Image.new('RGBA', (32, 32), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    draw.rectangle([5, 10, 15, 30], fill=(100, 100, 100))  # Cuerpo
+    draw.rectangle([15, 15, 25, 20], fill=(120, 120, 120))  # Cuello
+    draw.ellipse([20, 5, 30, 15], fill=(150, 150, 150))    # Cabeza
+    img.save('dino1.png')
+    
+    # Kanguro
+    img = Image.new('RGBA', (32, 32), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    draw.ellipse([10, 5, 22, 20], fill=(200, 150, 100))     # Cuerpo
+    draw.polygon([(5, 15), (15, 5), (25, 15)], fill=(180, 130, 90))  # Cabeza
+    draw.rectangle([5, 25, 10, 30], fill=(180, 130, 90))   # Pierna
+    img.save('kanguro1.png')
+    
+    # Pájaro
+    img = Image.new('RGBA', (32, 32), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    draw.ellipse([10, 10, 22, 22], fill=(255, 200, 50))     # Cuerpo
+    draw.polygon([(22, 15), (30, 10), (30, 20)], fill=(255, 200, 50))  # Ala
+    img.save('pajaro1.png')
+    
+    # Unicornio
+    img = Image.new('RGBA', (32, 32), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    draw.rectangle([10, 10, 20, 30], fill=(255, 255, 255))  # Cuerpo
+    draw.polygon([(20, 5), (25, 15), (30, 5)], fill=(255, 50, 200))  # Cuerno
+    img.save('unicornio1.png')
+    
+    # Obstáculos
+    # Cactus
+    img = Image.new('RGBA', (32, 32), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    draw.rectangle([12, 5, 18, 30], fill=(50, 150, 50))
+    draw.rectangle([5, 10, 12, 15], fill=(50, 200, 50))
+    img.save('cactus.png')
+    
+    # Piedra
+    img = Image.new('RGBA', (32, 32), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    draw.ellipse([5, 20, 27, 32], fill=(100, 100, 100))
+    img.save('piedra.png')
+    
+    # Nube
+    img = Image.new('RGBA', (32, 32), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    draw.ellipse([5, 5, 20, 15], fill=(255, 255, 255))
+    draw.ellipse([15, 10, 30, 20], fill=(255, 255, 255))
+    img.save('nube.png')
+
+crear_imagenes()
+
+{
+  "configurations": [
+    {
+      "type": "debugpy",
+      "request": "launch",
+      "name": "Launch Program",
+      "program": "${workspaceFolder}/${input:pythonFile}"
+    }
+  ],
+  "inputs": [
+    {
+      "type": "promptString",
+      "id": "pythonFile",
+      "description": "Enter the path to the Python file you want to debug"
+    }
+  ]
+}
